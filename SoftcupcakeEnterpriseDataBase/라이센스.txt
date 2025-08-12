@@ -1,4 +1,4 @@
-[제품명] 소스코드 라이선스 계약서 (최종본)
+Softcupcake Enterprise Database 소스코드 라이선스 계약서
 
 Copyright © 2025 윤도현. All rights reserved.
 
