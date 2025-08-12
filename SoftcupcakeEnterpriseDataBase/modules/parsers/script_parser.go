@@ -10,34 +10,34 @@ type Sc_tokenT int
 const (
 	SC_none Sc_tokenT = iota
 
-	//DB조작 키워드
-	SC_createTable //테이블 생성
-	SC_add         //데이터 추가
-	SC_update      //데이터 업데이트
-	SC_get         //데이터 가져오기
-	SC_delete      //데이터 삭제
+	// DB조작 키워드
+	SC_createTable // 테이블 생성
+	SC_add         // 데이터 추가
+	SC_update      // 데이터 업데이트
+	SC_get         // 데이터 가져오기
+	SC_delete      // 데이터 삭제
 
-	//특수 키워드
-	SC_key     //열 키 지정
-	SC_notNull //열 널 허용 하지 아니함
+	// 특수 키워드
+	SC_key     // 열 키 지정
+	SC_notNull // 열 널 허용 하지 아니함
 
-	//일반 토큰 타입
-	SC_number //숫자 타입 토큰
-	SC_string //문자/문자열 타입 토큰
+	// 일반 토큰 타입
+	SC_number // 숫자 타입 토큰
+	SC_string // 문자/문자열 타입 토큰
 
-	//열 타입
-	SC_columnNumber //열 타입 숫자
-	SC_columnText   //열 타입 문자/문자열
+	// 열 타입
+	SC_columnNumber // 열 타입 숫자
+	SC_columnText   // 열 타입 문자/문자열
 
-	//특수 토큰 타입
-	SC_tableName  //테이블 이름
-	SC_columnName //열 이름
+	// 특수 토큰 타입
+	SC_tableName  // 테이블 이름
+	SC_columnName // 열 이름
 
-	//특수문자
+	// 특수문자
 	SC_comma      // , <- 콤마
-	SC_blockStart // { <- 이거
-	SC_blockEnd   // } <- 이거
-	SC_endCmd     // ; <- 이거
+	SC_parenOpen  // ( <- 소괄호 열림
+	SC_parenClose // ) <- 소괄호 닫힘
+	SC_endCmd     // ; <- 명령어 종료
 )
 
 type SC_token struct {
@@ -45,8 +45,7 @@ type SC_token struct {
 	Token_type Sc_tokenT
 }
 
-// 렉서
-func Tokenize(input string, tokens *[]SC_token) int {
+func Parsing_script(input string, tokens *[]SC_token) int {
 	i := 0
 	n := len(input)
 
@@ -65,12 +64,12 @@ func Tokenize(input string, tokens *[]SC_token) int {
 			*tokens = append(*tokens, SC_token{Token: ",", Token_type: SC_comma})
 			i++
 			continue
-		case '{':
-			*tokens = append(*tokens, SC_token{Token: "{", Token_type: SC_blockStart})
+		case '(':
+			*tokens = append(*tokens, SC_token{Token: "(", Token_type: SC_parenOpen})
 			i++
 			continue
-		case '}':
-			*tokens = append(*tokens, SC_token{Token: "}", Token_type: SC_blockEnd})
+		case ')':
+			*tokens = append(*tokens, SC_token{Token: ")", Token_type: SC_parenClose})
 			i++
 			continue
 		case ';':
@@ -82,7 +81,7 @@ func Tokenize(input string, tokens *[]SC_token) int {
 			i++
 			start := i
 			for i < n && input[i] != '"' {
-				// 이스케이프 처리(필요시 구현 가능, 현재 생략)
+				// 이스케이프 처리 필요시 구현 가능 (현재 미구현)
 				i++
 			}
 			if i >= n {
@@ -162,19 +161,16 @@ func Tokenize(input string, tokens *[]SC_token) int {
 	return 0
 }
 
-// 유틸1
 func isIdentStart(c byte) bool {
 	return (c >= 'A' && c <= 'Z') ||
 		(c >= 'a' && c <= 'z') ||
 		c == '_'
 }
 
-// 유틸2
 func isIdentPart(c byte) bool {
 	return isIdentStart(c) || (c >= '0' && c <= '9')
 }
 
-// 에러 체크
 func Error_checker(tokens []SC_token, error_stream *string) int {
 	if len(tokens) == 0 {
 		*error_stream = "Empty token list\n<none>"
@@ -198,13 +194,15 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 
 	switch cmd.Token_type {
 	case SC_createTable:
+		// 테이블 이름 확인
 		if pos >= len(tokens) || tokens[pos].Token_type != SC_tableName {
 			*error_stream = "Missing or invalid table name\n" + tokenOrNone(pos)
 			return 1
 		}
 		pos++
 
-		if pos >= len(tokens) || tokens[pos].Token_type != SC_blockStart {
+		// '(' 확인
+		if pos >= len(tokens) || tokens[pos].Token_type != SC_parenOpen {
 			*error_stream = "Expected '(' after table name\n" + tokenOrNone(pos)
 			return 1
 		}
@@ -214,7 +212,7 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 		expectColumn := true
 
 		for pos < len(tokens) {
-			if tokens[pos].Token_type == SC_blockEnd {
+			if tokens[pos].Token_type == SC_parenClose {
 				pos++
 				break
 			}
@@ -229,18 +227,21 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 				continue
 			}
 
+			// 열 타입 체크
 			if pos >= len(tokens) || (tokens[pos].Token_type != SC_columnNumber && tokens[pos].Token_type != SC_columnText) {
 				*error_stream = "Expected column type 'number' or 'text'\n" + tokenOrNone(pos)
 				return 1
 			}
 			pos++
 
+			// 열 이름 체크
 			if pos >= len(tokens) || tokens[pos].Token_type != SC_tableName {
 				*error_stream = "Expected column name\n" + tokenOrNone(pos)
 				return 1
 			}
 			pos++
 
+			// 선택 속성 (NOTNULL, KEY) 체크
 			for pos < len(tokens) {
 				tokType := tokens[pos].Token_type
 				if tokType == SC_notNull {
@@ -265,11 +266,13 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 			return 1
 		}
 
-		if tokens[pos-1].Token_type != SC_blockEnd {
+		// ')' 닫힘 체크
+		if tokens[pos-1].Token_type != SC_parenClose {
 			*error_stream = "Missing closing ')'\n" + tokenOrNone(pos-1)
 			return 1
 		}
 
+		// 세미콜론 체크
 		if pos >= len(tokens) || tokens[pos].Token_type != SC_endCmd {
 			*error_stream = "Missing semicolon ';'\n" + tokenOrNone(pos)
 			return 1
@@ -285,7 +288,7 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 		}
 		pos++
 
-		if pos >= len(tokens) || tokens[pos].Token_type != SC_blockStart {
+		if pos >= len(tokens) || tokens[pos].Token_type != SC_parenOpen {
 			*error_stream = "Expected '(' after table name\n" + tokenOrNone(pos)
 			return 1
 		}
@@ -293,8 +296,9 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 
 		expectValue := true
 		valueCount := 0
+
 		for pos < len(tokens) {
-			if tokens[pos].Token_type == SC_blockEnd {
+			if tokens[pos].Token_type == SC_parenClose {
 				pos++
 				break
 			}
@@ -315,10 +319,12 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 			pos++
 			expectValue = false
 		}
+
 		if valueCount == 0 {
 			*error_stream = "No data values provided\n<none>"
 			return 1
 		}
+
 		if pos >= len(tokens) || tokens[pos].Token_type != SC_endCmd {
 			*error_stream = "Missing semicolon ';'\n" + tokenOrNone(pos)
 			return 1
@@ -340,7 +346,7 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 		}
 		pos++
 
-		if pos >= len(tokens) || tokens[pos].Token_type != SC_blockStart {
+		if pos >= len(tokens) || tokens[pos].Token_type != SC_parenOpen {
 			*error_stream = "Expected '(' after key value\n" + tokenOrNone(pos)
 			return 1
 		}
@@ -348,8 +354,9 @@ func Error_checker(tokens []SC_token, error_stream *string) int {
 
 		expectValue := true
 		valueCount := 0
+
 		for pos < len(tokens) {
-			if tokens[pos].Token_type == SC_blockEnd {
+			if tokens[pos].Token_type == SC_parenClose {
 				pos++
 				break
 			}

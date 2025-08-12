@@ -5,6 +5,8 @@ import (
 	"sedb/modules/parsers"
 )
 
+//test 1
+/*
 func main() {
 
 	tff := "Title : \"test_table\"\nTABLE_S BEGIN \n COL1 number,COL2 text\nEND DATA_SECTION :\n Data->"
@@ -20,4 +22,19 @@ func main() {
 		fmt.Printf("Token %d: Type=%v, Value=%v\n", i, tok.Token_type, tok.Token)
 	}
 
+}*/
+
+func main() {
+	script := `create_table new_table(number col1 text "col 2" NOTNULL KEY);`
+
+	var tokens []parsers.SC_token
+	err := parsers.Parsing_script(script, &tokens)
+	if err == 1 {
+		fmt.Println("Parsing error!")
+		return
+	}
+
+	for _, t := range tokens {
+		fmt.Printf("Type: %v, Token: %q\n", t.Token_type, t.Token)
+	}
 }
