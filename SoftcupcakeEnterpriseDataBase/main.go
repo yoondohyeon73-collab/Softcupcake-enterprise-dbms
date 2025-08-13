@@ -1,10 +1,5 @@
 package main
 
-import (
-	"fmt"
-	"sedb/modules/parsers"
-)
-
 //test 1
 /*
 func main() {
@@ -24,6 +19,7 @@ func main() {
 
 }*/
 
+/*
 func main() {
 	script := `create_table new_table(number col1 text "col 2" NOTNULL KEY);`
 
@@ -38,3 +34,11 @@ func main() {
 		fmt.Printf("Type: %v, Token: %q\n", t.Token_type, t.Token)
 	}
 }
+
+func main() {
+	err := fileuti.WriteToFile("./hello/text.txt", "hello world!")
+
+	if err == 1 {
+		println("Fuck!")
+	}
+}*/
