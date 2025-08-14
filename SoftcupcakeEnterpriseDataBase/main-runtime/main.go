@@ -21,7 +21,7 @@ func main() {
 
 /*
 func main() {
-	script := `create_table new_table(number col1 text "col 2" NOTNULL KEY);`
+	script := `create_table new_table(number col1, text col2 NOTNULL KEY);`
 
 	var tokens []parsers.SC_token
 	err := parsers.Parsing_script(script, &tokens)
@@ -30,11 +30,17 @@ func main() {
 		return
 	}
 
-	for _, t := range tokens {
-		fmt.Printf("Type: %v, Token: %q\n", t.Token_type, t.Token)
+	var err_s string
+	err_n := parsers.Error_checker(tokens, &err_s)
+	if err_n == 1 {
+		fmt.Println(err_s)
 	}
+		for _, t := range tokens {
+			fmt.Printf("Type: %v, Token: %q\n", t.Token_type, t.Token)
+		}
 }
-
+*/
+/*
 func main() {
 	err := fileuti.WriteToFile("./hello/text.txt", "hello world!")
 

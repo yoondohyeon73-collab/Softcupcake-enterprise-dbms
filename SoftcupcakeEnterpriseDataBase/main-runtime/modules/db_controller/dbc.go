@@ -4,6 +4,7 @@ import (
 	"fmt"
 	dbinfo "sedb/db_info"
 	"sedb/modules/parsers"
+	"sedb/modules/table"
 )
 
 /*
@@ -33,6 +34,22 @@ func Cmd_exec(script string, db_info dbinfo.DB_info) int {
 	switch script_tokens[0].Token_type {
 	//테이블 생성
 	case parsers.SC_createTable:
+
+		//신규 태이블
+		var new_table table.Table
+		new_table.Table_name = script_tokens[1].Token.(string) //테이블 이름 저장
+
+		// 255번 반복
+		for i := 0; i < 255; i++ {
+			new_table.Columns_struct[i].Name = script_tokens[i+3].Token.(string) //열 이름 저장
+			//타입 저장
+			if script_tokens[i+2].Token.(string) == "Number" {
+				new_table.Columns_struct[i].Type = table.CT_number
+			} else {
+				new_table.Columns_struct[i].Type = table.CT_text
+			}
+
+		}
 
 	//데이터 가져오기
 	case parsers.SC_get:
