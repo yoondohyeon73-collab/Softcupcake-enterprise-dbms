@@ -10,27 +10,27 @@ type Tff_tokenT int
 const (
 	Tff_none Tff_tokenT = iota
 	// 선언 키워드
-	Tff_title       // 타이틀
-	Tff_TableS      // 테이블 구조 키워드
-	Tff_Cnumber     // 열 타입 숫자
-	Tff_Ctext       // 열 타입 문자/문자열
-	Tff_ColumnName  // 열 이름
-	Tff_dataSection // 데이터 저장섹션 표시
+	Tff_title
+	Tff_TableS
+	Tff_Cnumber
+	Tff_Ctext
+	Tff_ColumnName
+	Tff_dataSection
 
-	// 속성 토큰 추가
-	Tff_Notnull // NOTNULL
-	Tff_Key     // KEY
+	// 속성
+	Tff_Notnull
+	Tff_Key
 
-	// 토큰 타입
-	Tff_string  // 문자열/문자
-	Tff_float64 // float64 타입 숫자
+	// 데이터 타입
+	Tff_string
+	Tff_float64
 
 	// 특수 토큰
-	Tff_begin     // 시작 키워드 (BEGIN)
-	Tff_end       // 종료 키워드 (END)
-	Tff_dataStart // Data-> (데이터 시작 표시)
-	Tff_dataEnd   // ->End (데이터 종료 표시)
-	Tff_comma     // , (콤마)
+	Tff_begin
+	Tff_end
+	Tff_dataStart
+	Tff_dataEnd
+	Tff_comma
 )
 
 type Tff_token struct {
@@ -38,10 +38,38 @@ type Tff_token struct {
 	Token_type Tff_tokenT
 }
 
-// ParseHeader는 DATA_SECTION 전까지 파싱 (타이틀 + 테이블 구조)
+// 숫자 여부 판별 (간단하게)
+func isNumeric(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if (c < '0' || c > '9') && c != '.' && c != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+// ParseHeader : DATA_SECTION 전까지 파싱
 func ParseHeader(input string, tokens *[]Tff_token) int {
 	lines := strings.Split(input, "\n")
 	inTable := false
+
+	// 속성 매핑
+	attrMap := map[string]Tff_tokenT{
+		"NOTNULL": Tff_Notnull,
+		"KEY":     Tff_Key,
+	}
+
+	// 열 타입 매핑
+	typeMap := map[string]Tff_tokenT{
+		"number": Tff_Cnumber,
+		"text":   Tff_Ctext,
+	}
+
+	*tokens = make([]Tff_token, 0, len(lines)*2) // 대략 capacity 예측
 
 	for _, raw := range lines {
 		line := strings.TrimSpace(raw)
@@ -49,67 +77,71 @@ func ParseHeader(input string, tokens *[]Tff_token) int {
 			continue
 		}
 
+		// 데이터 섹션 시작
 		if strings.HasPrefix(line, "DATA_SECTION") {
-			*tokens = append(*tokens, Tff_token{Token: "DATA_SECTION", Token_type: Tff_dataSection})
+			*tokens = append(*tokens, Tff_token{"DATA_SECTION", Tff_dataSection})
 			return 0
 		}
 
+		// 타이틀
 		if strings.HasPrefix(line, "Title") {
-			*tokens = append(*tokens, Tff_token{Token: "Title", Token_type: Tff_title})
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) < 2 {
+			colonIdx := strings.Index(line, ":")
+			if colonIdx == -1 {
 				return 1
 			}
-			val := strings.TrimSpace(parts[1])
-			*tokens = append(*tokens, Tff_token{Token: val, Token_type: Tff_string})
+			*tokens = append(*tokens, Tff_token{"Title", Tff_title})
+			val := strings.TrimSpace(line[colonIdx+1:])
+			*tokens = append(*tokens, Tff_token{val, Tff_string})
 			continue
 		}
 
+		// 테이블 시작
 		if strings.HasPrefix(line, "TABLE_S") && strings.Contains(line, "BEGIN") {
-			*tokens = append(*tokens, Tff_token{Token: "TABLE_S", Token_type: Tff_TableS})
-			*tokens = append(*tokens, Tff_token{Token: "BEGIN", Token_type: Tff_begin})
+			*tokens = append(*tokens, Tff_token{"TABLE_S", Tff_TableS})
+			*tokens = append(*tokens, Tff_token{"BEGIN", Tff_begin})
 			inTable = true
 			continue
 		}
 
+		// 테이블 끝
 		if inTable && strings.HasPrefix(line, "END") {
-			*tokens = append(*tokens, Tff_token{Token: "END", Token_type: Tff_end})
+			*tokens = append(*tokens, Tff_token{"END", Tff_end})
 			inTable = false
 			continue
 		}
 
+		// 테이블 내용
 		if inTable {
-			cols := strings.Split(line, ",")
-			for _, col := range cols {
-				col = strings.TrimSpace(col)
-				if col == "" {
-					continue
-				}
-				parts := strings.Fields(col)
-				if len(parts) < 2 {
-					return 1
-				}
+			// , 단위로만 쪼개기
+			start := 0
+			for i := 0; i <= len(line); i++ {
+				if i == len(line) || line[i] == ',' {
+					part := strings.TrimSpace(line[start:i])
+					start = i + 1
+					if part == "" {
+						continue
+					}
 
-				colType := parts[0]
-				colName := parts[1]
+					fields := strings.Fields(part)
+					if len(fields) < 2 {
+						return 1
+					}
 
-				switch strings.ToLower(colType) {
-				case "number":
-					*tokens = append(*tokens, Tff_token{Token: colType, Token_type: Tff_Cnumber})
-				case "text":
-					*tokens = append(*tokens, Tff_token{Token: colType, Token_type: Tff_Ctext})
-				default:
-					*tokens = append(*tokens, Tff_token{Token: colType, Token_type: Tff_none})
-				}
+					colType := strings.ToLower(fields[0])
+					if t, ok := typeMap[colType]; ok {
+						*tokens = append(*tokens, Tff_token{fields[0], t})
+					} else {
+						*tokens = append(*tokens, Tff_token{fields[0], Tff_none})
+					}
 
-				*tokens = append(*tokens, Tff_token{Token: colName, Token_type: Tff_ColumnName})
+					*tokens = append(*tokens, Tff_token{fields[1], Tff_ColumnName})
 
-				for _, attr := range parts[2:] {
-					switch strings.ToUpper(attr) {
-					case "NOTNULL":
-						*tokens = append(*tokens, Tff_token{Token: "NOTNULL", Token_type: Tff_Notnull})
-					case "KEY":
-						*tokens = append(*tokens, Tff_token{Token: "KEY", Token_type: Tff_Key})
+					if len(fields) > 2 {
+						for _, attr := range fields[2:] {
+							if t, ok := attrMap[strings.ToUpper(attr)]; ok {
+								*tokens = append(*tokens, Tff_token{attr, t})
+							}
+						}
 					}
 				}
 			}
@@ -119,64 +151,40 @@ func ParseHeader(input string, tokens *[]Tff_token) int {
 	return 0
 }
 
-// ParseDataSection는 DATA_SECTION 이후 전체 데이터 섹션 파싱
-func ParseDataSection(input string, tokens *[]Tff_token) int {
-	lines := strings.Split(input, "\n")
-
-	for _, raw := range lines {
-		line := strings.TrimSpace(raw)
-		if line == "" {
-			continue
-		}
-
-		if strings.HasPrefix(line, "{") && strings.HasSuffix(line, "}") {
-			*tokens = append(*tokens, Tff_token{Token: "{", Token_type: Tff_begin})
-			dataStr := strings.Trim(line, "{} ")
-			items := strings.Split(dataStr, ",")
-			for i, it := range items {
-				val := strings.TrimSpace(it)
-				if f, err := strconv.ParseFloat(val, 64); err == nil {
-					*tokens = append(*tokens, Tff_token{Token: f, Token_type: Tff_float64})
-				} else {
-					*tokens = append(*tokens, Tff_token{Token: val, Token_type: Tff_string})
-				}
-				if i < len(items)-1 {
-					*tokens = append(*tokens, Tff_token{Token: ",", Token_type: Tff_comma})
-				}
-			}
-			*tokens = append(*tokens, Tff_token{Token: "}", Token_type: Tff_end})
-		}
-	}
-
-	return 0
-}
-
-// ParseDataLine은 Data-> [데이터...] ->End 한줄만 파싱
+// ParseDataLine : Data-> [ ... ] ->End
 func ParseDataLine(line string, tokens *[]Tff_token) int {
 	line = strings.TrimSpace(line)
 	if !strings.HasPrefix(line, "Data->") || !strings.HasSuffix(line, "->End") {
 		return 1
 	}
 
-	*tokens = append(*tokens, Tff_token{Token: "Data->", Token_type: Tff_dataStart})
+	*tokens = append(*tokens, Tff_token{"Data->", Tff_dataStart})
 
 	body := strings.TrimPrefix(line, "Data->")
 	body = strings.TrimSuffix(body, "->End")
 	body = strings.TrimSpace(body)
 	body = strings.Trim(body, "[]")
-	items := strings.Split(body, ",")
-	for i, it := range items {
-		val := strings.TrimSpace(it)
-		if f, err := strconv.ParseFloat(val, 64); err == nil {
-			*tokens = append(*tokens, Tff_token{Token: f, Token_type: Tff_float64})
-		} else {
-			*tokens = append(*tokens, Tff_token{Token: val, Token_type: Tff_string})
-		}
-		if i < len(items)-1 {
-			*tokens = append(*tokens, Tff_token{Token: ",", Token_type: Tff_comma})
+
+	start := 0
+	for i := 0; i <= len(body); i++ {
+		if i == len(body) || body[i] == ',' {
+			part := strings.TrimSpace(body[start:i])
+			start = i + 1
+			if part == "" {
+				continue
+			}
+			if isNumeric(part) {
+				f, _ := strconv.ParseFloat(part, 64)
+				*tokens = append(*tokens, Tff_token{f, Tff_float64})
+			} else {
+				*tokens = append(*tokens, Tff_token{part, Tff_string})
+			}
+			if i < len(body) {
+				*tokens = append(*tokens, Tff_token{",", Tff_comma})
+			}
 		}
 	}
 
-	*tokens = append(*tokens, Tff_token{Token: "->End", Token_type: Tff_dataEnd})
+	*tokens = append(*tokens, Tff_token{"->End", Tff_dataEnd})
 	return 0
 }
