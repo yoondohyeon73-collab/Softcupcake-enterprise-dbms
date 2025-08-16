@@ -13,7 +13,6 @@ def create_db(db_name, db_info):
             "version": db_info["version"],
             "Is beta": db_info["Is beta"]   # 오타 수정: Is bata → Is beta
         },
-        "Archive Storage Directory": db_info["Archive Storage Directory"],
         "server port": db_info["server port"]
     }
 
@@ -23,13 +22,10 @@ def create_db(db_name, db_info):
     with open(f"./{db_name}/info.json", "w", encoding="utf-8") as f:
         json.dump(db_info_formatted, f, indent=4, ensure_ascii=False)
 
-
-# db정보
-db_info = {
-    "version": 0.01,
-    "Is beta": "Beta",   # 여기 키값은 그대로 두되, 저장 시 "Is beta"로 바꿔서 씀
-    "Archive Storage Directory": "./Archive",
-    "server port": 8000
+#db버전
+db_version = {
+    "version" : 0.01,
+    "is Beta" : "Beta"
 }
 
 #메뉴얼 출력
@@ -53,3 +49,33 @@ print(print_arg)
 
 while True:
     user_cmd = input("CMD : ")
+
+    #db생성
+    if user_cmd == 'create' or user_cmd == 'Create':
+
+        #db정보 만들기
+        db_info = {}
+
+        #db이름/실행할 포트 입력받기
+        db_name = input("Enter db name : ")
+        server_port = input("Enter the port to run the server : ")
+
+        #info정의
+        db_info["name"] = db_name
+        db_info["server port"] = server_port
+        db_info["version"] = db_version["version"]
+        db_info["Is beta"] = db_version["is Beta"]
+
+        #db정보 출력
+        print('Check db information\n')
+        print(db_info)
+        print('\nCreate db (y/n)\n')
+        
+        #db생성 (y/n)에 따라 실행
+        yorn = input('')
+        if yorn == 'y' or yorn == 'Y':
+            create_db(db_info["name"], db_info)
+        else:
+            print('End db creation\n')
+            db_info = {}
+            
